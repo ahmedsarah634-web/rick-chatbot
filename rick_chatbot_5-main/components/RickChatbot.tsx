@@ -10,13 +10,13 @@ const RickChatbot = () => {
   const [pendingMessage, setPendingMessage] = useState(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [showChatHistory, setShowChatHistory] = useState(false);
 
   const audioRef = useRef(null);
-  const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
 
+  // ===============================
   // Speech Recognition Setup
+  // ===============================
   useEffect(() => {
     if (typeof window !== "undefined") {
       const SpeechRecognition =
@@ -24,35 +24,27 @@ const RickChatbot = () => {
 
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.lang = navigator.language;
+        recognitionRef.current.lang = 'en-US';
         recognitionRef.current.interimResults = false;
+        recognitionRef.current.continuous = false;
 
         recognitionRef.current.onresult = (event) => {
           const transcript = event.results[0][0].transcript;
-          setInputMessage(transcript);
-
-          setTimeout(() => {
-            sendMessage(transcript);
-          }, 500);
+          sendMessage(transcript);
         };
       }
     }
   }, []);
 
   const startListening = () => {
-    if (recognitionRef.current) {
+    if (recognitionRef.current && !isPlayingAudio) {
       recognitionRef.current.start();
     }
   };
 
-  // Scroll to bottom
-  useEffect(() => {
-    if (messagesEndRef.current && showChatHistory) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, pendingMessage, showChatHistory]);
-
-  // Handle audio playback
+  // ===============================
+  // Audio Playback
+  // ===============================
   useEffect(() => {
     if (audioUrl && audioRef.current && pendingMessage) {
       setIsPlayingAudio(true);
@@ -60,27 +52,37 @@ const RickChatbot = () => {
       audioRef.current.load();
       audioRef.current.play().catch(err => {
         console.error('Playback error', err);
-        setMessages(prev => [...prev, pendingMessage]);
-        setPendingMessage(null);
-        setIsPlayingAudio(false);
+        finishRickMessage();
       });
     }
   }, [audioUrl, pendingMessage]);
 
-  const handleAudioEnd = () => {
+  const finishRickMessage = () => {
     if (pendingMessage) {
       setMessages(prev => [...prev, pendingMessage]);
       setPendingMessage(null);
     }
     setIsPlayingAudio(false);
+
+    // Auto start listening again (continuous conversation)
+    if (recognitionRef.current) {
+      recognitionRef.current.start();
+    }
   };
 
+  // ===============================
+  // Send Message
+  // ===============================
   const sendMessage = async (voiceText = null) => {
     const messageToSend = voiceText || inputMessage;
-
     if (!messageToSend.trim() || isLoading) return;
 
-    const userMessage = { role: 'user', content: messageToSend, timestamp: Date.now() };
+    const userMessage = {
+      role: 'user',
+      content: messageToSend,
+      timestamp: Date.now()
+    };
+
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsLoading(true);
@@ -89,9 +91,7 @@ const RickChatbot = () => {
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [...messages, userMessage].slice(-10)
         }),
@@ -99,10 +99,10 @@ const RickChatbot = () => {
 
       const data = await response.json();
 
-      const rickMessage = { 
-        role: 'assistant', 
-        content: data.message, 
-        timestamp: Date.now() 
+      const rickMessage = {
+        role: 'assistant',
+        content: data.message,
+        timestamp: Date.now()
       };
 
       setIsThinking(false);
@@ -116,18 +116,23 @@ const RickChatbot = () => {
 
     } catch (error) {
       console.error('Error sending message:', error);
-      const errorMessage = { 
-        role: 'assistant', 
-        content: 'Aw jeez, something went wrong!', 
-        timestamp: Date.now() 
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Aw jeez, something went wrong!',
+          timestamp: Date.now()
+        }
+      ]);
       setIsThinking(false);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // ===============================
+  // Controls
+  // ===============================
   const clearChat = () => {
     setMessages([]);
     setAudioUrl(null);
@@ -144,10 +149,19 @@ const RickChatbot = () => {
     }
   };
 
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      sendMessage();
+    }
+  };
+
+  // ===============================
+  // UI
+  // ===============================
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-[#ffffff] to-black">
       <div className="max-w-6xl mx-auto p-4 flex flex-col h-screen">
-        
+
         {/* 3D Rick */}
         <div className="flex-1 bg-black bg-opacity-30 rounded-lg border border-[#ff5e00] shadow-2xl overflow-hidden mb-4">
           <Rick3DViewer 
@@ -166,12 +180,13 @@ const RickChatbot = () => {
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Ask Rick something..."
+              onKeyDown={handleKeyPress}
+              placeholder="Talk to Rick..."
               className="flex-1 p-4 bg-black bg-opacity-50 border border-[#ff5e00] rounded-lg text-white"
               disabled={isLoading || isPlayingAudio || isThinking}
             />
 
-            {/* Microphone Button */}
+            {/* Microphone */}
             <button
               onClick={startListening}
               className="px-4 py-4 bg-black border border-[#ff5e00] text-white rounded-lg"
@@ -179,7 +194,7 @@ const RickChatbot = () => {
               🎤
             </button>
 
-            {/* Send Button */}
+            {/* Send */}
             <button
               onClick={() => sendMessage()}
               disabled={isLoading || isPlayingAudio || isThinking || !inputMessage.trim()}
@@ -204,7 +219,7 @@ const RickChatbot = () => {
               <Trash2 size={16} />
               <span>Clear Chat</span>
             </button>
-            
+
             {audioUrl && (
               <button
                 onClick={replayAudio}
@@ -223,7 +238,7 @@ const RickChatbot = () => {
         ref={audioRef}
         className="hidden"
         preload="auto"
-        onEnded={handleAudioEnd}
+        onEnded={finishRickMessage}
       />
     </div>
   );
