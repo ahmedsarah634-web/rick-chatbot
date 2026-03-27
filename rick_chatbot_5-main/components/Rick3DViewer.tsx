@@ -5,7 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 const Rick3DViewer = ({ 
   isPlayingAudio, 
-  isThinking = false,
+  isThinking = false, // New prop for thinking state
   modelUrl = '/models/rick.glb', 
   backgroundImageUrl = null, 
   isLoading = false 
@@ -17,23 +17,88 @@ const Rick3DViewer = ({
   const mixerRef = useRef(null);
   const modelRef = useRef(null);
   const clockRef = useRef(new THREE.Clock());
-  const animationsRef = useRef({ idle: [], talk: [], thinking: [] });
+  const animationsRef = useRef({
+    idle: [],
+    talk: [],
+    thinking: []
+  });
   const currentActionRef = useRef(null);
   const controlsRef = useRef(null);
-
-  // Lip sync refs
-  const analyserRef = useRef(null);
-  const dataArrayRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const mouthMeshRef = useRef(null);
-
+  
   const [modelLoaded, setModelLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState(null);
 
+  const normalizeModel = (model) => {
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    
+    model.position.x = -center.x;
+    model.position.y = -center.y;
+    model.position.z = -center.z;
+    
+    const maxDimension = Math.max(size.x, size.y, size.z);
+    const targetSize = 3;
+    const scale = maxDimension > 0.01 ? targetSize / maxDimension : 1;
+    model.scale.setScalar(scale);
+    
+    const updatedBox = new THREE.Box3().setFromObject(model);
+    const updatedSize = updatedBox.getSize(new THREE.Vector3());
+    
+    model.position.y = (updatedSize.y / 2) - (updatedSize.y * 0.7);
+    
+    return { size: updatedSize, center: updatedBox.getCenter(new THREE.Vector3()) };
+  };
+
+  const adjustCameraForModel = (camera, controls, modelInfo) => {
+    const distance = Math.max(modelInfo.size.x, modelInfo.size.y, modelInfo.size.z) * 1.2;
+    const height = modelInfo.size.y * 0.3;
+    
+    camera.position.set(distance * 0.6, height + distance * 0.4, distance * 0.7);
+    camera.lookAt(0, height, 0);
+    
+    if (controls) {
+      controls.target.set(0, height, 0);
+      controls.minDistance = distance * 0.2;
+      controls.maxDistance = distance * 2;
+      controls.update();
+    }
+  };
+
+  const getRandomAnimation = (category) => {
+    const animations = animationsRef.current[category];
+    if (!animations || animations.length === 0) {
+      console.warn(`No animations found for category: ${category}`);
+      return null;
+    }
+    
+    const randomIndex = Math.floor(Math.random() * animations.length);
+    return {
+      action: animations[randomIndex],
+      index: randomIndex
+    };
+  };
+
+  const startAnimation = (action, animationName) => {
+    if (!action) return;
+    
+    try {
+      action.reset();
+      action.setLoop(THREE.LoopRepeat);
+      action.clampWhenFinished = false;
+      action.enabled = true;
+      action.setEffectiveWeight(1.0);
+      action.setEffectiveTimeScale(1.0);
+      action.play();
+    } catch (error) {
+      console.error(`Error starting animation ${animationName}:`, error);
+    }
+  };
+
   useEffect(() => {
     if (!mountRef.current) return;
-
+    
     let animationFrameId;
     let mounted = true;
     const currentMount = mountRef.current;
@@ -84,14 +149,8 @@ const Rick3DViewer = ({
         const model = gltf.scene;
         modelRef.current = model;
 
-        // Find morph targets for mouth
-        model.traverse((child) => {
-          if (child.isMesh && child.morphTargetInfluences) {
-            mouthMeshRef.current = child;
-            console.log("Lip sync mesh found:", child.name);
-          }
-        });
-
+        const modelInfo = normalizeModel(model);
+        adjustCameraForModel(camera, controls, modelInfo);
         scene.add(model);
 
         if (gltf.animations && gltf.animations.length > 0) {
@@ -135,22 +194,6 @@ const Rick3DViewer = ({
         mixerRef.current.update(delta);
       }
 
-      // Lip Sync
-      if (analyserRef.current && mouthMeshRef.current && isPlayingAudio) {
-        analyserRef.current.getByteFrequencyData(dataArrayRef.current);
-
-        let sum = 0;
-        for (let i = 0; i < dataArrayRef.current.length; i++) {
-          sum += dataArrayRef.current[i];
-        }
-
-        const volume = sum / dataArrayRef.current.length;
-
-        if (mouthMeshRef.current.morphTargetInfluences) {
-          mouthMeshRef.current.morphTargetInfluences[0] = volume / 80;
-        }
-      }
-
       controls.update();
       renderer.render(scene, camera);
     };
@@ -166,25 +209,29 @@ const Rick3DViewer = ({
     };
   }, [modelUrl, backgroundImageUrl]);
 
-  // Setup Audio Analyzer when Rick talks
   useEffect(() => {
-    if (!isPlayingAudio) return;
+    if (!modelLoaded || !mixerRef.current) return;
 
-    const audio = document.querySelector('audio');
-    if (!audio) return;
+    let targetAnimationCategory = 'idle';
+    if (isThinking) targetAnimationCategory = 'thinking';
+    else if (isPlayingAudio) targetAnimationCategory = 'talk';
 
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-      const source = audioContextRef.current.createMediaElementSource(audio);
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 256;
+    const randomAnimation = getRandomAnimation(targetAnimationCategory);
+    if (!randomAnimation) return;
 
-      source.connect(analyserRef.current);
-      analyserRef.current.connect(audioContextRef.current.destination);
+    const targetAction = randomAnimation.action;
 
-      dataArrayRef.current = new Uint8Array(analyserRef.current.frequencyBinCount);
+    if (targetAction !== currentActionRef.current) {
+      if (currentActionRef.current) {
+        currentActionRef.current.fadeOut(0.5);
+      }
+
+      targetAction.reset();
+      targetAction.fadeIn(0.5);
+      targetAction.play();
+      currentActionRef.current = targetAction;
     }
-  }, [isPlayingAudio]);
+  }, [isPlayingAudio, isThinking, modelLoaded]);
 
   return (
     <div className="relative w-full h-full">
@@ -192,7 +239,7 @@ const Rick3DViewer = ({
 
       {!modelLoaded && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="text-center text-[#ff5e00]">
+          <div className="text-[#ff5e00]">
             Loading model... {Math.round(loadingProgress)}%
           </div>
         </div>
@@ -200,7 +247,7 @@ const Rick3DViewer = ({
 
       {error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="text-[#ff5e00] text-center">{error}</div>
+          <div className="text-[#ff5e00]">{error}</div>
         </div>
       )}
     </div>
