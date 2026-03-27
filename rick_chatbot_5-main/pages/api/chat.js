@@ -88,6 +88,11 @@ async function generateAudio(text) {
   }
 
   try {
+
+   console.log('Fish API Key exists:', !!process.env.FISH_API_KEY);
+   console.log('Fish Model ID:', process.env.FISH_MODEL_ID);
+   console.log('Text being sent:', text.substring(0, 50));
+    
     const response = await fetch('https://api.fish.audio/v1/tts', {
       method: 'POST',
       headers: {
