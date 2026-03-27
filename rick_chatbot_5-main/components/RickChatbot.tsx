@@ -15,7 +15,7 @@ const RickChatbot = () => {
   const recognitionRef = useRef(null);
 
   // ===============================
-  // Speech Recognition Setup (Multilingual)
+  // Speech Recognition Setup
   // ===============================
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -25,13 +25,14 @@ const RickChatbot = () => {
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
 
-        // Multilingual speech recognition
-        recognitionRef.current.lang = navigator.language || 'en-US';
+        // Keep English recognition for stability
+        recognitionRef.current.lang = 'en-US';
         recognitionRef.current.interimResults = false;
         recognitionRef.current.continuous = false;
 
         recognitionRef.current.onresult = (event) => {
           const transcript = event.results[0][0].transcript;
+          console.log("Voice input:", transcript);
           sendMessage(transcript);
         };
 
@@ -42,8 +43,13 @@ const RickChatbot = () => {
     }
   }, []);
 
+  // ===============================
+  // Start Listening
+  // ===============================
   const startListening = async () => {
-    // Unlock audio for mobile browsers
+    console.log("Starting microphone...");
+
+    // Unlock audio autoplay (mobile fix)
     if (audioRef.current) {
       try {
         await audioRef.current.play();
@@ -61,17 +67,24 @@ const RickChatbot = () => {
   // ===============================
   useEffect(() => {
     if (audioUrl && audioRef.current && pendingMessage) {
+      console.log("Playing Rick audio:", audioUrl);
+
       setIsPlayingAudio(true);
       audioRef.current.src = audioUrl;
       audioRef.current.load();
 
-      audioRef.current.play().catch(err => {
-        console.error('Playback error', err);
-        finishRickMessage();
-      });
+      audioRef.current.play()
+        .then(() => console.log("Audio playing"))
+        .catch(err => {
+          console.error('Playback error', err);
+          finishRickMessage();
+        });
     }
   }, [audioUrl, pendingMessage]);
 
+  // ===============================
+  // When Rick Finishes Talking
+  // ===============================
   const finishRickMessage = () => {
     if (pendingMessage) {
       setMessages(prev => [...prev, pendingMessage]);
@@ -80,10 +93,12 @@ const RickChatbot = () => {
 
     setIsPlayingAudio(false);
 
-    // Continuous conversation
-    if (recognitionRef.current) {
-      recognitionRef.current.start();
-    }
+    // Restart mic after Rick talks
+    setTimeout(() => {
+      if (recognitionRef.current) {
+        recognitionRef.current.start();
+      }
+    }, 500);
   };
 
   // ===============================
@@ -202,7 +217,6 @@ const RickChatbot = () => {
               disabled={isLoading || isPlayingAudio || isThinking}
             />
 
-            {/* Microphone */}
             <button
               onClick={startListening}
               className="px-4 py-4 bg-black border border-[#ff5e00] text-white rounded-lg"
@@ -210,7 +224,6 @@ const RickChatbot = () => {
               🎤
             </button>
 
-            {/* Send */}
             <button
               onClick={() => sendMessage()}
               disabled={isLoading || isPlayingAudio || isThinking || !inputMessage.trim()}
@@ -220,13 +233,11 @@ const RickChatbot = () => {
             </button>
           </div>
 
-          {/* Status */}
           <div className="text-center text-[#ff5e00] mt-2">
             {isThinking && <p>Rick is thinking...</p>}
             {isPlayingAudio && <p>Rick is talking...</p>}
           </div>
 
-          {/* Controls */}
           <div className="flex gap-3 justify-center mt-4">
             <button
               onClick={clearChat}
@@ -249,7 +260,6 @@ const RickChatbot = () => {
         </div>
       </div>
 
-      {/* Audio */}
       <audio
         ref={audioRef}
         className="hidden"
@@ -261,3 +271,4 @@ const RickChatbot = () => {
 };
 
 export default RickChatbot;
+  
