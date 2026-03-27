@@ -15,7 +15,7 @@ const RickChatbot = () => {
   const recognitionRef = useRef(null);
 
   // ===============================
-  // Speech Recognition Setup
+  // Speech Recognition Setup (Multilingual)
   // ===============================
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -24,7 +24,9 @@ const RickChatbot = () => {
 
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.lang = 'en-US';
+
+        // Multilingual speech recognition
+        recognitionRef.current.lang = navigator.language || 'en-US';
         recognitionRef.current.interimResults = false;
         recognitionRef.current.continuous = false;
 
@@ -32,11 +34,23 @@ const RickChatbot = () => {
           const transcript = event.results[0][0].transcript;
           sendMessage(transcript);
         };
+
+        recognitionRef.current.onerror = (event) => {
+          console.error("Speech recognition error:", event.error);
+        };
       }
     }
   }, []);
 
-  const startListening = () => {
+  const startListening = async () => {
+    // Unlock audio for mobile browsers
+    if (audioRef.current) {
+      try {
+        await audioRef.current.play();
+        audioRef.current.pause();
+      } catch (e) {}
+    }
+
     if (recognitionRef.current && !isPlayingAudio) {
       recognitionRef.current.start();
     }
@@ -50,6 +64,7 @@ const RickChatbot = () => {
       setIsPlayingAudio(true);
       audioRef.current.src = audioUrl;
       audioRef.current.load();
+
       audioRef.current.play().catch(err => {
         console.error('Playback error', err);
         finishRickMessage();
@@ -62,9 +77,10 @@ const RickChatbot = () => {
       setMessages(prev => [...prev, pendingMessage]);
       setPendingMessage(null);
     }
+
     setIsPlayingAudio(false);
 
-    // Auto start listening again (continuous conversation)
+    // Continuous conversation
     if (recognitionRef.current) {
       recognitionRef.current.start();
     }
