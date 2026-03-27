@@ -15,7 +15,7 @@ const RickChatbot = () => {
   const recognitionRef = useRef(null);
 
   // ===============================
-  // Speech Recognition Setup
+  // Speech Recognition Setup (Multilingual)
   // ===============================
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -25,14 +25,13 @@ const RickChatbot = () => {
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
 
-        // Keep English recognition for stability
-        recognitionRef.current.lang = 'en-US';
+        // Multilingual speech recognition
+        recognitionRef.current.lang = navigator.language || 'en-US';
         recognitionRef.current.interimResults = false;
         recognitionRef.current.continuous = false;
 
         recognitionRef.current.onresult = (event) => {
           const transcript = event.results[0][0].transcript;
-          console.log("Voice input:", transcript);
           sendMessage(transcript);
         };
 
@@ -43,13 +42,8 @@ const RickChatbot = () => {
     }
   }, []);
 
-  // ===============================
-  // Start Listening
-  // ===============================
   const startListening = async () => {
-    console.log("Starting microphone...");
-
-    // Unlock audio autoplay (mobile fix)
+    // Unlock audio for mobile browsers
     if (audioRef.current) {
       try {
         await audioRef.current.play();
@@ -67,24 +61,17 @@ const RickChatbot = () => {
   // ===============================
   useEffect(() => {
     if (audioUrl && audioRef.current && pendingMessage) {
-      console.log("Playing Rick audio:", audioUrl);
-
       setIsPlayingAudio(true);
       audioRef.current.src = audioUrl;
       audioRef.current.load();
 
-      audioRef.current.play()
-        .then(() => console.log("Audio playing"))
-        .catch(err => {
-          console.error('Playback error', err);
-          finishRickMessage();
-        });
+      audioRef.current.play().catch(err => {
+        console.error('Playback error', err);
+        finishRickMessage();
+      });
     }
   }, [audioUrl, pendingMessage]);
 
-  // ===============================
-  // When Rick Finishes Talking
-  // ===============================
   const finishRickMessage = () => {
     if (pendingMessage) {
       setMessages(prev => [...prev, pendingMessage]);
@@ -93,12 +80,10 @@ const RickChatbot = () => {
 
     setIsPlayingAudio(false);
 
-    // Restart mic after Rick talks
-    setTimeout(() => {
-      if (recognitionRef.current) {
-        recognitionRef.current.start();
-      }
-    }, 500);
+    // Continuous conversation
+    if (recognitionRef.current) {
+      recognitionRef.current.start();
+    }
   };
 
   // ===============================
@@ -270,5 +255,5 @@ const RickChatbot = () => {
   );
 };
 
-export default RickChatbot;
+export default RickChatbot; RickChatbot;
   
