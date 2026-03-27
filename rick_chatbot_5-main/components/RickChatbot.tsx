@@ -15,7 +15,7 @@ const RickChatbot = () => {
   const recognitionRef = useRef(null);
 
   // ===============================
-  // Speech Recognition Setup (Multilingual)
+  // Speech Recognition Setup
   // ===============================
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -25,8 +25,7 @@ const RickChatbot = () => {
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
 
-        // Multilingual speech recognition
-        export default RickChatbot;
+        recognitionRef.current.lang = 'en-US';
         recognitionRef.current.interimResults = false;
         recognitionRef.current.continuous = false;
 
@@ -43,7 +42,7 @@ const RickChatbot = () => {
   }, []);
 
   const startListening = async () => {
-    // Unlock audio for mobile browsers
+    // Unlock audio autoplay for mobile
     if (audioRef.current) {
       try {
         await audioRef.current.play();
@@ -80,7 +79,7 @@ const RickChatbot = () => {
 
     setIsPlayingAudio(false);
 
-    // Continuous conversation
+    // Restart mic after Rick talks
     if (recognitionRef.current) {
       recognitionRef.current.start();
     }
@@ -255,5 +254,4 @@ const RickChatbot = () => {
   );
 };
 
-export default RickChatbot; 
-  
+export default RickChatbot;
