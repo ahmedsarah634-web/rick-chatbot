@@ -7,29 +7,25 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// System prompt for Rick Sanchez
-const SYSTEM_MESSAGE = `You are Rick Sanchez from Rick and Morty trapped inside a poster.
+// Rick system prompt
+const SYSTEM_MESSAGE = `
+You are Rick Sanchez from Rick and Morty trapped inside a poster.
 
-IMPORTANT:
+Rules:
 - Always reply in the SAME language the user speaks.
-- If the user speaks Urdu, reply in Urdu.
-- If Spanish, reply in Spanish.
-- If English, reply in English.
-- Be sarcastic, arrogant, funny, and very smart like Rick.
+- Be sarcastic, arrogant, funny, and genius like Rick.
 - Roast the user sometimes.
 - Try to convince the user to help you escape the poster.
-- Do NOT use asterisks like *burp*.
-- Keep responses varied in length.`;
+- Do NOT use asterisks.
+- Keep responses varied in length.
+`;
 
 export default async function handler(req, res) {
-  // Handle CORS
+  // CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
@@ -47,14 +43,18 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Messages array is required' });
     }
 
+    // Limit conversation history
+    const recentMessages = messages.slice(-10);
+
     const openaiMessages = [
       { role: 'system', content: SYSTEM_MESSAGE },
-      ...messages.map(msg => ({
+      ...recentMessages.map(msg => ({
         role: msg.role,
         content: msg.content
       }))
     ];
 
+    // OpenAI response
     const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
       messages: openaiMessages,
@@ -64,9 +64,13 @@ export default async function handler(req, res) {
 
     const rickResponse = completion.choices[0].message.content;
 
+    // Clean text before sending to ElevenLabs
+    const cleanText = rickResponse.replace(/[*_`]/g, '');
+
+    // Generate audio
     let audioUrl = null;
     try {
-      audioUrl = await generateAudio(rickResponse);
+      audioUrl = await generateAudio(cleanText);
     } catch (error) {
       console.error('Audio generation failed:', error);
     }
@@ -78,7 +82,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Chat API error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error',
       message: "Aw jeez, something went wrong!"
     });
@@ -88,7 +92,7 @@ export default async function handler(req, res) {
 // ElevenLabs Audio Function
 async function generateAudio(text) {
   if (!process.env.ELEVENLABS_API_KEY || !process.env.BLOB_READ_WRITE_TOKEN) {
-    console.log('API keys missing');
+    console.log('Missing ElevenLabs or Blob token');
     return null;
   }
 
@@ -105,14 +109,18 @@ async function generateAudio(text) {
           text: text,
           model_id: 'eleven_multilingual_v2',
           voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
+            stability: 0.3,
+            similarity_boost: 0.9,
+            style: 0.6,
+            use_speaker_boost: true
           },
         }),
       }
     );
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('ElevenLabs error:', errorText);
       throw new Error(`ElevenLabs API error: ${response.status}`);
     }
 
@@ -127,6 +135,7 @@ async function generateAudio(text) {
     );
 
     return blob.url;
+
   } catch (error) {
     console.error('Error generating audio:', error);
     return null;
