@@ -26,7 +26,7 @@ const RickChatbot = () => {
         recognitionRef.current = new SpeechRecognition();
 
         // Multilingual speech recognition
-        recognitionRef.current.lang = navigator.language || 'en-US';
+        export default RickChatbot;
         recognitionRef.current.interimResults = false;
         recognitionRef.current.continuous = false;
 
@@ -255,5 +255,5 @@ const RickChatbot = () => {
   );
 };
 
-export default RickChatbot; RickChatbot;
+export default RickChatbot; 
   
