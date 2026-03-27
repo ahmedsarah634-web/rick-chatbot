@@ -16,6 +16,7 @@ Rules:
 `;
 
 export default async function handler(req, res) {
+  // CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
@@ -34,6 +35,7 @@ export default async function handler(req, res) {
     const { messages } = req.body;
     const recentMessages = messages.slice(-10);
 
+    // Get last user message for language matching
     const lastUserMessage = recentMessages
       .filter(m => m.role === 'user')
       .pop()?.content || '';
@@ -49,6 +51,7 @@ Reply in the same language as this message:
       ...recentMessages
     ];
 
+    // OpenAI response
     const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
       messages: openaiMessages,
@@ -59,6 +62,7 @@ Reply in the same language as this message:
     const rickResponse = completion.choices[0].message.content;
     const cleanText = rickResponse.replace(/[*_]/g, '');
 
+    // Generate audio
     let audioUrl = null;
     try {
       audioUrl = await generateAudio(cleanText);
@@ -79,6 +83,9 @@ Reply in the same language as this message:
   }
 }
 
+// ============================
+// ElevenLabs Audio Function
+// ============================
 async function generateAudio(text) {
   try {
     const response = await fetch(
@@ -92,27 +99,33 @@ async function generateAudio(text) {
         },
         body: JSON.stringify({
           text: text,
-          model_id: 'eleven_multilingual_v2',
+          model_id: 'eleven_multilingual_v2'
         }),
       }
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('ElevenLabs error:', errorText);
+      console.log("ElevenLabs error:", errorText);
       return null;
     }
 
-    const buffer = await response.arrayBuffer();
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("audio")) {
+      console.log("Invalid audio response type:", contentType);
+      return null;
+    }
 
-    if (!buffer || buffer.byteLength === 0) {
-      console.error('Empty audio buffer');
+    const audioBuffer = await response.arrayBuffer();
+
+    if (!audioBuffer || audioBuffer.byteLength === 0) {
+      console.log("Empty audio buffer");
       return null;
     }
 
     const blob = await put(
       `rick-response-${Date.now()}.mp3`,
-      Buffer.from(buffer),
+      Buffer.from(audioBuffer),
       {
         access: 'public',
         contentType: 'audio/mpeg'
@@ -122,7 +135,7 @@ async function generateAudio(text) {
     return blob.url;
 
   } catch (error) {
-    console.error('Error generating audio:', error);
+    console.error("Audio generation error:", error);
     return null;
   }
 }
