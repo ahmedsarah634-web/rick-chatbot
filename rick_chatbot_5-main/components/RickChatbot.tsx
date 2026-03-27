@@ -22,26 +22,42 @@ const RickChatbot = () => {
       const SpeechRecognition =
         window.SpeechRecognition || window.webkitSpeechRecognition;
 
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition();
-
-        recognitionRef.current.lang = 'en-US';
-        recognitionRef.current.interimResults = false;
-        recognitionRef.current.continuous = false;
-
-        recognitionRef.current.onresult = (event) => {
-          const transcript = event.results[0][0].transcript;
-          sendMessage(transcript);
-        };
-
-        recognitionRef.current.onerror = (event) => {
-          console.error("Speech recognition error:", event.error);
-        };
+      if (!SpeechRecognition) {
+        console.log("Speech Recognition not supported in this browser");
+        return;
       }
+
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.lang = 'en-US';
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.continuous = false;
+
+      recognitionRef.current.onstart = () => {
+        console.log("Microphone started");
+      };
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        console.log("You said:", transcript);
+        sendMessage(transcript);
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.log("Speech error:", event.error);
+      };
+
+      recognitionRef.current.onend = () => {
+        console.log("Microphone stopped");
+      };
     }
   }, []);
 
+  // ===============================
+  // Start Listening
+  // ===============================
   const startListening = async () => {
+    console.log("Mic button clicked");
+
     // Unlock audio autoplay for mobile
     if (audioRef.current) {
       try {
@@ -50,8 +66,15 @@ const RickChatbot = () => {
       } catch (e) {}
     }
 
-    if (recognitionRef.current && !isPlayingAudio) {
+    if (!recognitionRef.current) {
+      console.log("Speech recognition not available");
+      return;
+    }
+
+    try {
       recognitionRef.current.start();
+    } catch (error) {
+      console.log("Error starting microphone:", error);
     }
   };
 
@@ -60,6 +83,8 @@ const RickChatbot = () => {
   // ===============================
   useEffect(() => {
     if (audioUrl && audioRef.current && pendingMessage) {
+      console.log("Playing audio:", audioUrl);
+
       setIsPlayingAudio(true);
       audioRef.current.src = audioUrl;
       audioRef.current.load();
