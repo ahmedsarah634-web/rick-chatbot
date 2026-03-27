@@ -4,8 +4,8 @@ const nextConfig = {
   swcMinify: true,
   env: {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    FISH_API_KEY: process.env.FISH_API_KEY,
-    FISH_MODEL_ID: process.env.FISH_MODEL_ID,
+    ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
+    ELEVENLABS_VOICE_ID: process.env.ELEVENLABS_VOICE_ID,
   },
 }
 
