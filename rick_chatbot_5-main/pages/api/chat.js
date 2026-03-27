@@ -38,7 +38,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Messages array is required' });
     }
 
-    // Prepare messages for OpenAI
     const openaiMessages = [
       { role: 'system', content: SYSTEM_MESSAGE },
       ...messages.map(msg => ({
@@ -47,7 +46,6 @@ export default async function handler(req, res) {
       }))
     ];
 
-    // Get response from OpenAI
     const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
       messages: openaiMessages,
@@ -57,13 +55,11 @@ export default async function handler(req, res) {
 
     const rickResponse = completion.choices[0].message.content;
 
-    // Generate audio using Fish Audio API
     let audioUrl = null;
     try {
       audioUrl = await generateAudio(rickResponse);
     } catch (error) {
       console.error('Audio generation failed:', error);
-      // Continue without audio if it fails
     }
 
     res.status(200).json({
@@ -75,39 +71,44 @@ export default async function handler(req, res) {
     console.error('Chat API error:', error);
     res.status(500).json({ 
       error: 'Internal server error',
-      message: "Aw jeez, something went wrong with the interdimensional communication! *burp*"
+      message: "Aw jeez, something went wrong!"
     });
   }
 }
 
+// ElevenLabs Audio Function
+async function generateAudio(text) {
+  if (!process.env.ELEVENLABS_API_KEY || !process.env.BLOB_READ_WRITE_TOKEN) {
+    console.log('API keys missing');
+    return null;
+  }
 
   try {
-
-   console.log('Fish API Key exists:', !!process.env.FISH_API_KEY);
-   console.log('Fish Model ID:', process.env.FISH_MODEL_ID);
-   console.log('Text being sent:', text.substring(0, 50));
-    
-    const response = await fetch('https://api.fish.audio/v1/tts', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.FISH_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text: text,
-        reference_id: process.env.FISH_MODEL_ID || 'f0227f70151e4366965c8ac77c28e9ad',
-        format: 'mp3',
-        mp3_bitrate: 128,
-      }),
-    });
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVENLABS_VOICE_ID}`,
+      {
+        method: 'POST',
+        headers: {
+          'xi-api-key': process.env.ELEVENLABS_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75,
+          },
+        }),
+      }
+    );
 
     if (!response.ok) {
-      throw new Error(`Fish API error: ${response.status}`);
+      throw new Error(`ElevenLabs API error: ${response.status}`);
     }
 
     const buffer = await response.arrayBuffer();
 
-    // Upload to Vercel Blob
     const blob = await put(
       `rick-response-${Date.now()}.mp3`,
       new Blob([buffer], { type: 'audio/mpeg' }),
@@ -118,7 +119,7 @@ export default async function handler(req, res) {
 
     return blob.url;
   } catch (error) {
-    console.error('Error generating or uploading audio:', error);
+    console.error('Error generating audio:', error);
     return null;
   }
 }
