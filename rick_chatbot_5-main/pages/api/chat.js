@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     const { messages } = req.body;
     const recentMessages = messages.slice(-10);
 
-    // Get last user message for language matching
+    // Language matching
     const lastUserMessage = recentMessages
       .filter(m => m.role === 'user')
       .pop()?.content || '';
