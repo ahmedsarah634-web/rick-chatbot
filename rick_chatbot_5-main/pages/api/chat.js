@@ -114,7 +114,6 @@ async function generateAudio(text) {
       new Blob([buffer], { type: 'audio/mpeg' }),
       {
         access: 'public',
-        token: process.env.BLOB_READ_WRITE_TOKEN
       }
     );
 
