@@ -14,51 +14,31 @@ const RickChatbot = () => {
   const audioRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // ===============================
-  // Speech Recognition Setup
-  // ===============================
+  // Speech Recognition
   useEffect(() => {
     if (typeof window !== "undefined") {
       const SpeechRecognition =
         window.SpeechRecognition || window.webkitSpeechRecognition;
 
-      if (!SpeechRecognition) {
-        console.log("Speech Recognition not supported in this browser");
-        return;
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.lang = 'en-US';
+        recognitionRef.current.interimResults = false;
+        recognitionRef.current.continuous = false;
+
+        recognitionRef.current.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          sendMessage(transcript);
+        };
+
+        recognitionRef.current.onerror = (event) => {
+          console.error("Speech recognition error:", event.error);
+        };
       }
-
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.lang = 'en-US';
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.continuous = false;
-
-      recognitionRef.current.onstart = () => {
-        console.log("Microphone started");
-      };
-
-      recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        console.log("You said:", transcript);
-        sendMessage(transcript);
-      };
-
-      recognitionRef.current.onerror = (event) => {
-        console.log("Speech error:", event.error);
-      };
-
-      recognitionRef.current.onend = () => {
-        console.log("Microphone stopped");
-      };
     }
   }, []);
 
-  // ===============================
-  // Start Listening
-  // ===============================
   const startListening = async () => {
-    console.log("Mic button clicked");
-
-    // Unlock audio autoplay for mobile
     if (audioRef.current) {
       try {
         await audioRef.current.play();
@@ -66,25 +46,14 @@ const RickChatbot = () => {
       } catch (e) {}
     }
 
-    if (!recognitionRef.current) {
-      console.log("Speech recognition not available");
-      return;
-    }
-
-    try {
+    if (recognitionRef.current && !isPlayingAudio) {
       recognitionRef.current.start();
-    } catch (error) {
-      console.log("Error starting microphone:", error);
     }
   };
 
-  // ===============================
   // Audio Playback
-  // ===============================
   useEffect(() => {
     if (audioUrl && audioRef.current && pendingMessage) {
-      console.log("Playing audio:", audioUrl);
-
       setIsPlayingAudio(true);
       audioRef.current.src = audioUrl;
       audioRef.current.load();
@@ -104,15 +73,11 @@ const RickChatbot = () => {
 
     setIsPlayingAudio(false);
 
-    // Restart mic after Rick talks
     if (recognitionRef.current) {
       recognitionRef.current.start();
     }
   };
 
-  // ===============================
-  // Send Message
-  // ===============================
   const sendMessage = async (voiceText = null) => {
     const messageToSend = voiceText || inputMessage;
     if (!messageToSend.trim() || isLoading) return;
@@ -170,9 +135,6 @@ const RickChatbot = () => {
     }
   };
 
-  // ===============================
-  // Controls
-  // ===============================
   const clearChat = () => {
     setMessages([]);
     setAudioUrl(null);
@@ -195,14 +157,10 @@ const RickChatbot = () => {
     }
   };
 
-  // ===============================
-  // UI
-  // ===============================
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-[#ffffff] to-black">
       <div className="max-w-6xl mx-auto p-4 flex flex-col h-screen">
 
-        {/* 3D Rick */}
         <div className="flex-1 bg-black bg-opacity-30 rounded-lg border border-[#ff5e00] shadow-2xl overflow-hidden mb-4">
           <Rick3DViewer 
             isPlayingAudio={isPlayingAudio}
@@ -213,7 +171,6 @@ const RickChatbot = () => {
           />
         </div>
 
-        {/* Input Area */}
         <div className="bg-black bg-opacity-30 rounded-lg border border-[#ff5e00] shadow-2xl p-4">
           <div className="flex space-x-3">
             <input
@@ -226,10 +183,7 @@ const RickChatbot = () => {
               disabled={isLoading || isPlayingAudio || isThinking}
             />
 
-            <button
-              onClick={startListening}
-              className="px-4 py-4 bg-black border border-[#ff5e00] text-white rounded-lg"
-            >
+            <button onClick={startListening} className="px-4 py-4 bg-black border border-[#ff5e00] text-white rounded-lg">
               🎤
             </button>
 
@@ -248,19 +202,13 @@ const RickChatbot = () => {
           </div>
 
           <div className="flex gap-3 justify-center mt-4">
-            <button
-              onClick={clearChat}
-              className="flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg border border-[#ff5e00]"
-            >
+            <button onClick={clearChat} className="flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg border border-[#ff5e00]">
               <Trash2 size={16} />
               <span>Clear Chat</span>
             </button>
 
             {audioUrl && (
-              <button
-                onClick={replayAudio}
-                className="flex items-center space-x-2 px-4 py-2 bg-[#ff5e00] text-white rounded-lg"
-              >
+              <button onClick={replayAudio} className="flex items-center space-x-2 px-4 py-2 bg-[#ff5e00] text-white rounded-lg">
                 <Volume2 size={16} />
                 <span>Replay Audio</span>
               </button>
@@ -269,12 +217,7 @@ const RickChatbot = () => {
         </div>
       </div>
 
-      <audio
-        ref={audioRef}
-        className="hidden"
-        preload="auto"
-        onEnded={finishRickMessage}
-      />
+      <audio ref={audioRef} className="hidden" preload="auto" onEnded={finishRickMessage} />
     </div>
   );
 };
