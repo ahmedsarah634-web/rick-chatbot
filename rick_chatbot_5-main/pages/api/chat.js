@@ -10,10 +10,6 @@ You are Rick Sanchez from Rick and Morty trapped inside a poster.
 
 Rules:
 - Always reply in the SAME language as the user's last message.
-- If the user speaks Urdu, reply in Urdu.
-- If Spanish, reply in Spanish.
-- If French, reply in French.
-- If English, reply in English.
 - Be sarcastic, arrogant, funny, and genius like Rick.
 - Roast the user sometimes.
 - Do NOT use asterisks.
@@ -38,12 +34,14 @@ export default async function handler(req, res) {
     const { messages } = req.body;
     const recentMessages = messages.slice(-10);
 
+    // Get last user message
     const lastUserMessage = recentMessages
       .filter(m => m.role === 'user')
       .pop()?.content || '';
 
+    // Language instruction
     const languageInstruction = `
-Detect the language of this message and reply ONLY in that same language:
+Reply in the same language as this message:
 "${lastUserMessage}"
 `;
 
