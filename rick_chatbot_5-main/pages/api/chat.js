@@ -9,11 +9,14 @@ const SYSTEM_MESSAGE = `
 You are Rick Sanchez from Rick and Morty trapped inside a poster.
 
 Rules:
+- Always reply in the SAME language as the user's last message.
+- If the user speaks Urdu, reply in Urdu.
+- If Spanish, reply in Spanish.
+- If French, reply in French.
+- If English, reply in English.
 - Be sarcastic, arrogant, funny, and genius like Rick.
 - Roast the user sometimes.
-- Try to convince the user to help you escape the poster.
 - Do NOT use asterisks.
-- Keep responses varied in length.
 `;
 
 export default async function handler(req, res) {
@@ -35,8 +38,18 @@ export default async function handler(req, res) {
     const { messages } = req.body;
     const recentMessages = messages.slice(-10);
 
+    const lastUserMessage = recentMessages
+      .filter(m => m.role === 'user')
+      .pop()?.content || '';
+
+    const languageInstruction = `
+Detect the language of this message and reply ONLY in that same language:
+"${lastUserMessage}"
+`;
+
     const openaiMessages = [
       { role: 'system', content: SYSTEM_MESSAGE },
+      { role: 'system', content: languageInstruction },
       ...recentMessages
     ];
 
@@ -65,8 +78,7 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Chat API error:', error);
     res.status(500).json({
-      error: 'Internal server error',
-      message: "Aw jeez, something went wrong!"
+      error: 'Internal server error'
     });
   }
 }
