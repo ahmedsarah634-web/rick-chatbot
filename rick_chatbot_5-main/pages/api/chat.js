@@ -34,12 +34,10 @@ export default async function handler(req, res) {
     const { messages } = req.body;
     const recentMessages = messages.slice(-10);
 
-    // Get last user message
     const lastUserMessage = recentMessages
       .filter(m => m.role === 'user')
       .pop()?.content || '';
 
-    // Language instruction
     const languageInstruction = `
 Reply in the same language as this message:
 "${lastUserMessage}"
@@ -82,28 +80,49 @@ Reply in the same language as this message:
 }
 
 async function generateAudio(text) {
-  const response = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVENLABS_VOICE_ID}`,
-    {
-      method: 'POST',
-      headers: {
-        'xi-api-key': process.env.ELEVENLABS_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text: text,
-        model_id: 'eleven_multilingual_v2',
-      }),
+  try {
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVENLABS_VOICE_ID}`,
+      {
+        method: 'POST',
+        headers: {
+          'xi-api-key': process.env.ELEVENLABS_API_KEY,
+          'Content-Type': 'application/json',
+          'Accept': 'audio/mpeg'
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: 'eleven_multilingual_v2',
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('ElevenLabs error:', errorText);
+      return null;
     }
-  );
 
-  const buffer = await response.arrayBuffer();
+    const buffer = await response.arrayBuffer();
 
-  const blob = await put(
-    `rick-response-${Date.now()}.mp3`,
-    new Blob([buffer], { type: 'audio/mpeg' }),
-    { access: 'public' }
-  );
+    if (!buffer || buffer.byteLength === 0) {
+      console.error('Empty audio buffer');
+      return null;
+    }
 
-  return blob.url;
+    const blob = await put(
+      `rick-response-${Date.now()}.mp3`,
+      Buffer.from(buffer),
+      {
+        access: 'public',
+        contentType: 'audio/mpeg'
+      }
+    );
+
+    return blob.url;
+
+  } catch (error) {
+    console.error('Error generating audio:', error);
+    return null;
+  }
 }
