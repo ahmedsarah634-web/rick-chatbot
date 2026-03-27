@@ -81,12 +81,6 @@ export default async function handler(req, res) {
 }
 
 
-async function generateAudio(text) {
-  if (!process.env.FISH_API_KEY || !process.env.BLOB_READ_WRITE_TOKEN) {
-    console.log('API keys missing');
-    return null;
-  }
-
   try {
 
    console.log('Fish API Key exists:', !!process.env.FISH_API_KEY);
