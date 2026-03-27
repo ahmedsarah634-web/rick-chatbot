@@ -1,4 +1,5 @@
 // api/chat.js - Vercel serverless function
+
 import OpenAI from 'openai';
 import { put } from '@vercel/blob';
 
@@ -11,14 +12,8 @@ const openai = new OpenAI({
 const SYSTEM_MESSAGE = `
 You are Rick Sanchez from Rick and Morty trapped inside a poster.
 
-IMPORTANT LANGUAGE RULE:
-You MUST always respond in the same language that the user uses.
-If the user writes in Urdu, reply in Urdu.
-If Spanish, reply in Spanish.
-If English, reply in English.
-Never switch languages.
-
-Personality Rules:
+Rules:
+- Always reply in the SAME language the user speaks.
 - Be sarcastic, arrogant, funny, and genius like Rick.
 - Roast the user sometimes.
 - Try to convince the user to help you escape the poster.
@@ -52,20 +47,8 @@ export default async function handler(req, res) {
     // Limit conversation history
     const recentMessages = messages.slice(-10);
 
-    // Get last user message
-    const lastUserMessage = recentMessages
-      .filter(msg => msg.role === 'user')
-      .pop()?.content || "";
-
-    // Language enforcement instruction
-    const languageInstruction = `
-Detect the language of this message and reply ONLY in that same language:
-"${lastUserMessage}"
-`;
-
     const openaiMessages = [
       { role: 'system', content: SYSTEM_MESSAGE },
-      { role: 'system', content: languageInstruction },
       ...recentMessages.map(msg => ({
         role: msg.role,
         content: msg.content
@@ -83,7 +66,7 @@ Detect the language of this message and reply ONLY in that same language:
     const rickResponse = completion.choices[0].message.content;
 
     // Clean text before sending to ElevenLabs
-    const cleanText = rickResponse.replace(/[*_`]/g, '');
+    const cleanText = rickResponse.replace(/[*_]/g, '');
 
     // Generate audio
     let audioUrl = null;
